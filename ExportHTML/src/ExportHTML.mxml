@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:WindowedApplication xmlns:fx="http://ns.adobe.com/mxml/2009"
+					   xmlns:s="library://ns.adobe.com/flex/spark"
+					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   initialize="init()"
+					   creationComplete="createhtml()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			private var _arrColl:ArrayCollection = new ArrayCollection([{status:"Sen",Age:"12"},
+				{status:"Gan",Age:"12"},{status:"Kum",Age:"12"},{status:"Chan",Age:"12"}]);
+			
+			private var _htmlString:String="<html>" +
+											"<head>"+
+											"<title>##fileName##</title>"+
+											"<style>" +
+											"table.sample {"+
+											"background-color:#FFFFFF;"+
+											"border: solid #000 1px;"+
+											"border-left:0px;"+
+											"font-size:13px;"+
+											"font-family:verdana;"+
+											"}"+
+											"table.sample td {"+
+											"border-LEFT: solid #666 1px;"+
+											"border-TOP: solid #666 1px;"+
+											"PADDING-LEFT:2PX;"+
+											"WIDTH:120px;"+
+											"text-align:center;"+
+											"vertical-align:bottom;"+
+											"}"+
+											".toprow {"+
+											"text-align: center;"+
+											"background-color: #aaaaaa;"+
+											"border-LEFT:solid #666 1px;"+
+											"}"+
+											"tr.d0 td {"+
+											"background-color: #CC9999; color: black;"+
+											"}"+
+											"tr.d1 td {"+
+											"background-color: #9999CC; color: black;"+
+											"}"+
+											"</style>"+
+											"<body>"+
+											"<P >"+
+											"DataGrid Details:"+
+											"</P>"+
+											"<br/>"+
+											"##_tabelContent##"+
+											"</body>"+
+											"</html>";
+				
+				
+							
+			[Bindable]
+			private var gBytes:ByteArray = new ByteArray();
+			
+			[Bindable]
+			private var gridColumn:String="";
+			[Bindable]
+			private var gridColumvalue:String="";
+			
+			
+			[Bindable]
+			private var gridDetails:String="";
+			[Bindable]
+			private var gridContainer:String="";
+			
+			
+			[Bindable]
+			private var tabelContainer:String="";
+			
+			
+			private function init() :void
+			{
+				var arr:Array = ["status","Age"];
+				for( var i:int = 0;i < arr.length;i++)
+				{
+					gridColumvalue +="<th bgcolor=#aaaaaa class=toprow>"+arr[i]+"</th>";
+				}
+				for( var j:int = 0;j < _arrColl.length;j++)
+				{
+					gridContainer +="<tr class=d"+(j%2==0?1:0)+"><td>"+_arrColl[j].status+"</td><td>"+_arrColl[j].Age+"</td></tr>"
+				}
+				gridColumn= "<table border=0 class=sample cellPadding=0 cellSpacing=0 ><thead><tr>"+gridColumvalue+"</tr></thead>";
+				gridDetails = "<tbody><tr>"+gridContainer+"</tbody></table>";
+				tabelContainer += gridColumn+gridDetails+"<br/><br/>";
+				
+				gridColumvalue ="";
+				gridContainer="";
+			}
+			// replace the String ... and saved as
+			private function createhtml() :void
+			{
+				var cContents:String = _htmlString;
+				cContents = cContents.replace( "##_tabelContent##", tabelContainer );
+				cContents = cContents.replace( "##fileName##", "Styled DataGrid" );
+				gBytes.writeMultiByte( cContents, "utf-8" );
+				var cFile:File = new File();
+				cFile = File.desktopDirectory.resolvePath("Task2.html" );
+				cFile.addEventListener( Event.SELECT, onSelectSave );
+				cFile.browseForSave( "report" );
+			}
+			/**
+			 * Function used to save the Html File ..
+			 **/
+			private function onSelectSave( event:Event ):void {
+				var cFile:File = event.target as File;
+				var cFS:FileStream = new FileStream();
+				cFile.removeEventListener( Event.SELECT, onSelectSave );
+				cFS.open( cFile, FileMode.WRITE );
+				cFS.writeBytes( gBytes );
+				cFS.close();
+				gBytes.length = 0;
+			}
+		]]>
+	</fx:Script>
+</s:WindowedApplication>

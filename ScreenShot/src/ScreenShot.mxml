@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:WindowedApplication xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" 
+					   width="364" height="250" initialize="init()">
+
+<fx:Script>
+	<![CDATA[	
+		import deng.fzip.FZip;
+		
+		import flash.filesystem.File;
+		import flash.system.Capabilities;
+		
+		import mx.collections.ArrayCollection;
+		import mx.controls.Alert;
+		import mx.events.CloseEvent;
+		import mx.events.ValidationResultEvent;
+		
+		import smtp.SMTPUtil;
+		
+		public var smtp:SMTPUtil 
+		[Bindable]
+		private var frameWidth:int;
+		[Bindable]
+		private var frameHeight:int;
+		private var count:int = 0;
+		private var byteColl :Array = new Array();
+		private var nativeProcess:NativeProcess;
+		private var myTimer:Timer;
+		private var zip:FZip;
+		private var file_1:File;
+		private var fileLoading:File;
+		private var file:File;
+		private var bitmapData : BitmapData
+		private var dockImage:BitmapData;
+		private var checkEmailStatus:Boolean;
+		
+		
+
+		
+		private function init() :void
+		{
+			var loader:Loader = new Loader();
+			loader.contentLoaderInfo.addEventListener(Event.COMPLETE, prepareForSystray);
+			loader.load(new URLRequest("images/ScreenCapture.gif"));
+			this.addEventListener(Event.CLOSING, closingApplication);
+		}
+		
+		private function clickToStart( event :Event ):void
+		{
+			
+			emailValidator.validate(mailID.text);
+			trace(checkEmailStatus+"===="+javaPath.text.length+"===="+subject.text.length)
+			if( checkEmailStatus && javaPath.text.length>0 && subject.text.length>0 ){
+				smtp = new SMTPUtil();
+				myTimer = new Timer(secCount.value*1000);
+				myTimer.addEventListener("timer", timerHandler);
+				myTimer.start();
+				count++ 
+			}else{
+				Alert.show("PLease fill all the field Correctly ");
+				
+			}
+		}
+		private function checkAllItem():void
+		{
+			
+		}
+		private function closingApplication(evt:Event):void {
+			evt.preventDefault();
+			Alert.yesLabel = "Close";
+			Alert.noLabel = "Minimize";
+			Alert.show("Close or minimize?", "Close?", 3, this, alertCloseHandler);
+		}
+		public function prepareForSystray(event:Event):void {
+			dockImage = event.target.content.bitmapData;
+			if (NativeApplication.supportsSystemTrayIcon){
+				setSystemTrayProperties();
+				SystemTrayIcon(NativeApplication.nativeApplication .icon).menu = createSystrayRootMenu();
+			}
+		}
+		private function alertCloseHandler(event:CloseEvent):void {
+			if (event.detail==Alert.YES) {
+				closeApp(event);
+			} else {
+				dock();
+			}
+		}
+		private function createSystrayRootMenu():NativeMenu{
+			var menu:NativeMenu = new NativeMenu();
+			var openNativeMenuItem:NativeMenuItem = new NativeMenuItem("Open");
+			var exitNativeMenuItem:NativeMenuItem = new NativeMenuItem("Exit");
+			openNativeMenuItem.addEventListener(Event.SELECT, undock);
+			exitNativeMenuItem.addEventListener(Event.SELECT, closeApp);
+			menu.addItem(openNativeMenuItem);
+			menu.addItem(new NativeMenuItem("",true));
+			menu.addItem(exitNativeMenuItem);
+			return menu;
+		}
+		private function setSystemTrayProperties():void{
+			SystemTrayIcon(NativeApplication.nativeApplication .icon).addEventListener(MouseEvent.CLICK, undock);
+			nativeWindow.addEventListener(NativeWindowDisplayStateEvent.DISPLAY_STATE_CHANGING, nwMinimized); //Catch the minimize event 
+		}
+		private function nwMinimized(displayStateEvent:NativeWindowDisplayStateEvent):void {
+			if(displayStateEvent.afterDisplayState == NativeWindowDisplayState.MINIMIZED) {
+				displayStateEvent.preventDefault();
+				dock();
+			}
+		}
+		public function dock():void {
+			nativeWindow.visible = false;
+			NativeApplication.nativeApplication .icon.bitmaps = [dockImage];
+		}
+		public function undock(evt:Event):void {
+			nativeWindow.visible = true;
+			nativeWindow.orderToFront();
+			NativeApplication.nativeApplication .icon.bitmaps = [];
+		}
+		private function closeApp(evt:Event):void {
+			nativeWindow.close();
+		}
+
+
+		public function timerHandler(event:TimerEvent):void {
+			NativeWindowDisplayState.MINIMIZED; 
+			startJava()
+		}
+
+		private function startJava():void
+		{
+			var arg:Vector.<String> = new Vector.<String>;
+			arg.push("-jar");
+			arg.push(File.applicationDirectory.resolvePath("Senthil.jar").nativePath);
+			
+			var directory:File = File.documentsDirectory.resolvePath("Apollo Test");
+			var file:File = File.documentsDirectory.resolvePath("Apollo Test/employees/bob/test.txt");
+			
+			var relativePath:String = javaPath.text; // employees/bob/test.txt
+			relativePath = relativePath.replace(/\//g, File.separator);
+			
+			var file:File = new File(relativePath);
+			file = file.resolvePath("bin/javaw.exe");
+			var npInfo:NativeProcessStartupInfo = new NativeProcessStartupInfo();
+			npInfo.executable = file;
+			npInfo.arguments = arg;
+			
+			nativeProcess = new NativeProcess();
+			//nativeWindow.visible = false;
+			nativeProcess.addEventListener(ProgressEvent.STANDARD_OUTPUT_DATA, onStandardOutputData);
+			nativeProcess.start(npInfo);
+			
+			nativeProcess.standardInput.writeMultiByte("Print Screen"+"\n", "utf-8");
+		}
+		
+		private function sendString(e:Event):void
+		{
+			nativeProcess.standardInput.writeMultiByte(e.currentTarget.label+"\n", "utf-8");
+			
+		}
+		
+		private function onStandardOutputData(e:ProgressEvent):void
+		{
+			var fileObject:Object = new Object();
+			if(myTimer.currentCount>3)
+			{
+				fileObject = new Object();
+				toZipTheFile();
+				
+			}
+
+			var orgBitMapData:BitmapData = Clipboard.generalClipboard.getData(ClipboardFormats.BITMAP_FORMAT) as BitmapData;
+			frameWidth = orgBitMapData.width * 0.65
+			frameHeight = orgBitMapData.height *0.65
+			image.source = new Bitmap(orgBitMapData,"auto",true);
+			bitmapData= new BitmapData (frameWidth, frameHeight);
+			bitmapData.draw (image); 
+			
+			
+			
+			var date:Date = new Date();
+			var year:String = String(date.fullYear);
+			var month:String = NumberUtil.pad(date.month + 1, 2);
+			var day:String = NumberUtil.pad(date.date, 2);
+			var hour:String = NumberUtil.pad(date.hours, 2);
+			var minute:String = NumberUtil.pad(date.minutes, 2);
+			var second:String = NumberUtil.pad(date.seconds, 2);
+			
+			
+				
+			
+			
+			var jpgEncoder:JPEGEncoder = new JPEGEncoder();
+			var byteArray:ByteArray = jpgEncoder.encode( bitmapData );
+			var filename:String = year + "-" + month + "-" + day + " " + hour + "." + minute + "." + second + ".jpg";
+			
+			
+			var file:File = File.documentsDirectory.resolvePath("ScreenShot/"+count+"/"+ filename);
+			 
+			fileObject.jpegName = filename;
+			fileObject.jpegBytes = byteArray;
+			byteColl.push(fileObject);
+			
+			var wr:File = new File( file.nativePath );
+			var stream:FileStream = new FileStream();
+			stream.open( wr , FileMode.WRITE);
+			stream.writeBytes ( byteArray, 0, byteArray.length );
+			stream.close();
+		}
+		
+		private function toZipTheFile() :void
+		{
+			var directory:File = File.documentsDirectory.resolvePath("ScreenShot/"+count)
+			var list:Array = directory.getDirectoryListing();
+			var zip:FZip = new FZip();
+			for (var i:int = 0; i < byteColl.length; i++) {
+				zip.addFile(byteColl[i].jpegName, byteColl[i].jpegBytes);
+			}
+			file = File.documentsDirectory;
+			file = file.resolvePath("1.zip");
+			var stream:FileStream = new FileStream();
+			stream.open(file, FileMode.WRITE);
+			zip.serialize(stream);
+			stream.close();	
+			
+			file_1 = File.documentsDirectory;
+			file_1 = file_1.resolvePath("1.zip");
+			file_1.load();
+			file_1.addEventListener(Event.COMPLETE,checkComplete)
+			//
+		}
+		private function checkComplete(evet:Event):void
+		{
+			SMTPUtil.attachMail(mailID.text,"Scrennshot",subject.text,file_1.data,"ScreenShot.zip");
+			byteColl = [];
+			myTimer.removeEventListener("timer", timerHandler);
+			stopJava();
+			count++
+			myTimer = new Timer(5000);
+			myTimer.addEventListener("timer", timerHandler);
+			myTimer.start()  
+		}
+		private function stopJava():void
+		{
+			nativeProcess.exit();
+		}
+		
+		
+		
+		private function emailValidator_valid(evt:ValidationResultEvent):void {
+			mailID.errorString = "";
+			checkEmailStatus = true
+		}
+		
+		private function emailValidator_invalid(evt:ValidationResultEvent):void {
+			mailID.errorString = evt.message;
+			checkEmailStatus = false
+		}
+		
+		
+
+	]]>
+</fx:Script>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+		<mx:EmailValidator id="emailValidator"
+						   valid="emailValidator_valid(event);"
+						   invalid="emailValidator_invalid(event);" />
+	</fx:Declarations>
+	<mx:Label id="message" />
+	<mx:Image id="image" width="{frameWidth}" height="{frameHeight}" includeInLayout="false" visible="false" maintainAspectRatio="true"/>
+	<s:Panel width="100%" height="100%" title="Screen Shot">
+		<mx:Form width="100%" >
+			<mx:FormItem width="100%" height="100%">
+				<mx:Canvas width="100%">
+					<s:Label text="Enter the Mail Id     "  x="0" y="0" width="100%"/>
+					<s:TextInput id="mailID" x="150" y="1" width="100%"/>
+				</mx:Canvas>
+			</mx:FormItem>
+			<mx:FormItem width="100%">
+				<mx:Canvas width="100%">
+					<s:Label text="Enter the Subject " width="100%"/>
+					<s:TextInput id="subject" x="150" y="0" width="100%"/>
+				</mx:Canvas>
+			</mx:FormItem>
+			<mx:FormItem width="100%">
+				<mx:Canvas width="100%">
+					<s:Label text="Enter The seconds " width="100%"/>
+					<s:NumericStepper maximum="60" minimum="1" id="secCount"  x="151" y="0"/>
+				</mx:Canvas>
+			</mx:FormItem>
+			<mx:FormItem width="100%">
+				<mx:Canvas width="100%">
+					<s:Label text="Enter the Java Path " width="100%"/>
+					<s:TextInput id="javaPath" x="150" y="0" width="100%"/>				
+				</mx:Canvas>
+			</mx:FormItem>
+			<mx:FormItem width="100%">
+				<mx:Canvas width="100%">
+					<s:Button label="START" x="240" y="0" click="clickToStart(event)"/>
+				</mx:Canvas>
+			</mx:FormItem>
+		</mx:Form>
+	</s:Panel>
+</s:WindowedApplication>
